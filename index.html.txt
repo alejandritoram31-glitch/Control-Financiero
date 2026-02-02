@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Finanzas Farmacia</title>
+
+<link rel="stylesheet" href="styles.css">
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+</head>
+
+<body>
+
+<!-- 🔐 PIN -->
+<div id="login" class="card">
+  <h2>🔐 Seguridad</h2>
+  <input type="password" id="pin" placeholder="Ingresa tu PIN">
+  <button onclick="verificarPIN()">Entrar</button>
+</div>
+
+<div id="app" style="display:none">
+
+<header>
+  <h1>💊 Finanzas Farmacia</h1>
+  <p>Dashboard financiero</p>
+</header>
+
+<section class="card">
+  <h2>📅 Periodo</h2>
+  <select id="tipoPeriodo">
+    <option value="semanal">Semanal</option>
+    <option value="mensual">Mensual</option>
+    <option value="bimestral">Bimestral</option>
+  </select>
+
+  <input id="periodo" placeholder="Ej. Semana 3 2026">
+
+  <label>Ingresos</label>
+  <input type="number" id="ingresos">
+
+  <label>Gastos</label>
+  <input type="number" id="gastos">
+</section>
+
+<section class="card">
+  <h2>⚙️ Porcentajes</h2>
+  <input type="number" id="reinversion" value="60">
+  <input type="number" id="libre" value="30">
+  <input type="number" id="ahorro" value="10">
+</section>
+
+<button onclick="guardar()">Guardar y analizar</button>
+
+<section class="card">
+  <h2>📊 Resumen</h2>
+  <div id="resumen"></div>
+  <div id="alerta" class="alert"></div>
+</section>
+
+<section class="card">
+  <h2>🔮 Proyección</h2>
+  <div id="proyeccion"></div>
+</section>
+
+<section class="card">
+  <h2>📈 Distribución</h2>
+  <canvas id="grafica"></canvas>
+</section>
+
+<section class="card">
+  <h2>📊 Comparación</h2>
+  <canvas id="graficaComparativa"></canvas>
+</section>
+
+<section class="card">
+  <h2>📤 Exportar</h2>
+  <button onclick="exportarExcel()">📊 Excel</button>
+  <button onclick="exportarPDF()">📄 PDF</button>
+</section>
+
+</div>
+
+<script>
+let chart, chartComparativa;
+
+/* 🔐 PIN */
+function verificarPIN(){
+  const pinIngresado = pin.value;
+  const pinGuardado = localStorage.getItem("pin");
+
+  if(!pinGuardado){
+    localStorage.setItem("pin", pinIngresado);
+    alert("PIN creado");
+  }
+
+  if(pinIngresado === localStorage.getItem("pin")){
+    login.style.display="none";
+    app.style.display="block";
+    cargarTodo();
+  }else{
+    alert("PIN incorrecto");
+  }
+}
+
+/* 💾 Guardar */
+function guardar(){
+  const data = {
+    periodo: periodo.value,
+    ingresos: +ingresos.value,
+    gastos: +gastos.value,
+    utilidad: ingresos.value - gastos.value,
+    fecha: Date.now()
+  };
+  localStorage.setItem("fin_"+data.periodo, JSON.stringify(data));
+  cargarTodo();
+}
+
+/* 🔄 Cargar */
+function cargarTodo(){
+  cargarResumen();
+  graficarComparacion();
+}
+
+/* 📊 Resumen */
+function cargarResumen(){
+  let regs=[];
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith("fin_"))
+      regs.push(JSON.parse(localStorage[k]));
+  });
+
+  if(!regs.length) return;
+
+  const u = regs.at(-1).utilidad;
+  resumen.innerHTML=`Utilidad actual: $${u}`;
+}
+
+/* 📊 Comparativa */
+function graficarComparacion(){
+  let l=[],i=[],g=[],u=[];
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith("fin_")){
+      const d=JSON.parse(localStorage[k]);
+      l.push(d.periodo); i.push(d.ingresos);
+      g.push(d.gastos); u.push(d.utilidad);
+    }
+  });
+
+  if(chartComparativa) chartComparativa.destroy();
+  chartComparativa=new Chart(graficaComparativa,{
+    type:"bar",
+    data:{labels:l,datasets:[
+      {label:"Ingresos",data:i},
+      {label:"Gastos",data:g},
+      {label:"Utilidad",data:u}
+    ]}
+  });
+}
+
+/* 📤 Excel */
+function exportarExcel(){
+  let datos=[];
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith("fin_")){
+      datos.push(JSON.parse(localStorage[k]));
+    }
+  });
+
+  const ws=XLSX.utils.json_to_sheet(datos);
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,"Finanzas");
+  XLSX.writeFile(wb,"finanzas_farmacia.xlsx");
+}
+
+/* 📄 PDF */
+function exportarPDF(){
+  const { jsPDF } = window.jspdf;
+  const pdf=new jsPDF();
+  pdf.text("Finanzas Farmacia",20,20);
+
+  let y=30;
+  Object.keys(localStorage).forEach(k=>{
+    if(k.startsWith("fin_")){
+      const d=JSON.parse(localStorage[k]);
+      pdf.text(`${d.periodo}: Utilidad $${d.utilidad}`,20,y);
+      y+=8;
+    }
+  });
+
+  pdf.save("finanzas_farmacia.pdf");
+}
+</script>
+
+</body>
+</html>
